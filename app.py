@@ -111,7 +111,7 @@ class FarmGame:
     def _validate_name(name: str) -> str:
         clean_name = str(name or "").strip()
         if not NAME_PATTERN.fullmatch(clean_name):
-            raise ValueError("Use 1-24 letters, numbers, spaces, apostrophes, or hyphens for player names.")
+            raise ValueError("Use 1-24 characters, starting with a letter or number, for player names.")
         return clean_name
 
     @staticmethod
@@ -147,10 +147,16 @@ class FarmRequestHandler(BaseHTTPRequestHandler):
             if route == "/join":
                 body = GAME.join_player(payload.get("name", ""))
             elif route == "/action":
+                try:
+                    plot_index = int(payload.get("plot", -1))
+                except (TypeError, ValueError):
+                    self._send_json(HTTPStatus.BAD_REQUEST, {"error": "Plot must be a whole number."})
+                    return
+
                 body = GAME.apply_action(
                     player=payload.get("player", ""),
                     action=payload.get("action", ""),
-                    plot_index=int(payload.get("plot", -1)),
+                    plot_index=plot_index,
                     crop=payload.get("crop"),
                 )
             else:
