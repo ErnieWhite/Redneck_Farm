@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Redneck Farm</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --mud: #3a2618;
+        --hay: #d9b36c;
+        --grass: #345f2f;
+        --barn: #8c2f22;
+      }
+
+      body {
+        margin: 0;
+        font-family: Arial, sans-serif;
+        background: linear-gradient(#77b8f2, #d7efff 45%, #678d3c 45%, #4e712f);
+        color: #fff7e2;
+      }
+
+      main {
+        max-width: 1100px;
+        margin: 0 auto;
+        padding: 1.5rem;
+      }
+
+      h1,
+      h2 {
+        margin: 0 0 0.75rem;
+      }
+
+      .banner,
+      .panel,
+      .plot {
+        background: rgba(28, 18, 11, 0.82);
+        border: 2px solid rgba(217, 179, 108, 0.45);
+        border-radius: 14px;
+        box-shadow: 0 12px 24px rgba(0, 0, 0, 0.2);
+      }
+
+      .banner {
+        padding: 1.25rem;
+        margin-bottom: 1rem;
+      }
+
+      .layout {
+        display: grid;
+        gap: 1rem;
+        grid-template-columns: 2fr 1fr;
+      }
+
+      .farm-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 1rem;
+      }
+
+      .plot,
+      .panel {
+        padding: 1rem;
+      }
+
+      label,
+      select,
+      input,
+      button {
+        font: inherit;
+      }
+
+      input,
+      select,
+      button {
+        border-radius: 8px;
+        border: 1px solid #c9a76f;
+        padding: 0.6rem 0.75rem;
+      }
+
+      input,
+      select {
+        width: 100%;
+        margin-bottom: 0.75rem;
+        background: #fff7e2;
+        color: #26180f;
+      }
+
+      button {
+        background: var(--barn);
+        color: #fff7e2;
+        cursor: pointer;
+        margin: 0.25rem 0.25rem 0 0;
+      }
+
+      button:disabled {
+        cursor: not-allowed;
+        opacity: 0.55;
+      }
+
+      ul {
+        padding-left: 1.1rem;
+      }
+
+      .status {
+        color: var(--hay);
+        min-height: 1.5rem;
+      }
+
+      @media (max-width: 850px) {
+        .layout {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <section class="banner">
+        <h1>Redneck Farm: Holler Co-op</h1>
+        <p>
+          Team up with your buddies, plant a few rows, and see who can haul in
+          the biggest harvest.
+        </p>
+      </section>
+
+      <div class="layout">
+        <section>
+          <div class="panel" style="margin-bottom: 1rem">
+            <h2>Join the crew</h2>
+            <input id="player-name" maxlength="24" placeholder="Farmhand name" />
+            <button id="join-button">Join Farm</button>
+            <p id="status" class="status"></p>
+          </div>
+          <div id="farm-grid" class="farm-grid"></div>
+        </section>
+
+        <aside class="panel">
+          <h2>Leaderboard</h2>
+          <ul id="players"></ul>
+          <h2>Farm chatter</h2>
+          <ul id="activity-log"></ul>
+        </aside>
+      </div>
+    </main>
+
+    <script>
+      const state = {
+        player: "",
+        snapshot: null,
+      };
+
+      const statusEl = document.getElementById("status");
+      const farmGridEl = document.getElementById("farm-grid");
+      const playersEl = document.getElementById("players");
+      const activityLogEl = document.getElementById("activity-log");
+      const nameEl = document.getElementById("player-name");
+
+      document.getElementById("join-button").addEventListener("click", async () => {
+        const name = nameEl.value.trim();
+        if (!name) {
+          setStatus("Punch in a farmhand name first.");
+          return;
+        }
+
+        const response = await postJson("/join", { name });
+        if (!response.ok) {
+          setStatus(response.error);
+          return;
+        }
+
+        state.player = name;
+        setStatus(`Howdy, ${name}! Pick a plot and get after it.`);
+        applySnapshot(response.data);
+      });
+
+      async function postJson(url, body) {
+        const response = await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+        const data = await response.json();
+        return { ok: response.ok, data, error: data.error };
+      }
+
+      function setStatus(message) {
+        statusEl.textContent = message;
+      }
+
+      function applySnapshot(snapshot) {
+        state.snapshot = snapshot;
+        renderPlayers(snapshot.players);
+        renderLog(snapshot.activity_log);
+        renderPlots(snapshot.plots, snapshot.allowed_crops);
+      }
+
+      function renderPlayers(players) {
+        playersEl.innerHTML = "";
+        players.forEach((player) => {
+          const item = document.createElement("li");
+          item.textContent = `${player.name}: ${player.harvests} haul(s)`;
+          playersEl.appendChild(item);
+        });
+      }
+
+      function renderLog(entries) {
+        activityLogEl.innerHTML = "";
+        [...entries].reverse().forEach((entry) => {
+          const item = document.createElement("li");
+          item.textContent = entry;
+          activityLogEl.appendChild(item);
+        });
+      }
+
+      function renderPlots(plots, crops) {
+        farmGridEl.innerHTML = "";
+
+        plots.forEach((plot) => {
+          const card = document.createElement("article");
+          card.className = "plot";
+
+          const title = document.createElement("h2");
+          title.textContent = `Plot ${plot.index + 1}`;
+          card.appendChild(title);
+
+          const meta = document.createElement("p");
+          meta.textContent = plot.crop
+            ? `${plot.crop} — ${plot.status} (last tended by ${plot.tended_by || "nobody"})`
+            : plot.status;
+          card.appendChild(meta);
+
+          const cropSelect = document.createElement("select");
+          crops.forEach((crop) => {
+            const option = document.createElement("option");
+            option.value = crop;
+            option.textContent = crop;
+            cropSelect.appendChild(option);
+          });
+          card.appendChild(cropSelect);
+
+          card.appendChild(actionButton("Plant", "plant", plot.index, cropSelect));
+          card.appendChild(actionButton("Water", "water", plot.index));
+          card.appendChild(actionButton("Harvest", "harvest", plot.index));
+
+          farmGridEl.appendChild(card);
+        });
+      }
+
+      function actionButton(label, action, plot, cropSelect) {
+        const button = document.createElement("button");
+        button.textContent = label;
+        button.disabled = !state.player;
+        button.addEventListener("click", async () => {
+          if (!state.player) {
+            setStatus("Join the farm first.");
+            return;
+          }
+
+          const payload = { player: state.player, action, plot };
+          if (cropSelect) {
+            payload.crop = cropSelect.value;
+          }
+
+          const response = await postJson("/action", payload);
+          if (!response.ok) {
+            setStatus(response.error);
+            return;
+          }
+
+          setStatus(`${label} action sent.`);
+          applySnapshot(response.data);
+        });
+        return button;
+      }
+
+      async function refreshState() {
+        const response = await fetch("/state", { cache: "no-store" });
+        const snapshot = await response.json();
+        applySnapshot(snapshot);
+      }
+
+      refreshState();
+      setInterval(refreshState, 2000);
+    </script>
+  </body>
+</html>
