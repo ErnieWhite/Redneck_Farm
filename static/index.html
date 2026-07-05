@@ -225,7 +225,7 @@
 
           const meta = document.createElement("p");
           meta.textContent = plot.crop
-            ? `${plot.crop} — ${plot.status} (last tended by ${plot.tended_by || "nobody"})`
+            ? `${plot.crop} — ${plot.status} (last tended by ${plot.tended_by || "not yet tended"})`
             : plot.status;
           card.appendChild(meta);
 

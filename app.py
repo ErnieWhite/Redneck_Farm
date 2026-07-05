@@ -169,6 +169,7 @@ class FarmRequestHandler(BaseHTTPRequestHandler):
         self._send_json(HTTPStatus.OK, body)
 
     def log_message(self, format: str, *args: Any) -> None:
+        # Keep the prototype server quiet so gameplay status stays readable in the console.
         return
 
     def _read_json(self) -> dict[str, Any] | None:
